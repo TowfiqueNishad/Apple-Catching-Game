@@ -150,7 +150,7 @@ class Dog:
         glPushMatrix()
         glTranslatef(0, -self.size * 0.6, self.size * 0.15)
         glRotatef(40, 1, 0, 0)
-        glutSolidCone(self.size * 0.2, self.size * 0.6, 6, 6)
+        glutSolidCone(self.size * 0.2, self.size * 0.6, 10, 10)
         glPopMatrix()
         glPopMatrix()
 
@@ -1421,4 +1421,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
