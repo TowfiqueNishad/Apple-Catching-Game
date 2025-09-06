@@ -100,7 +100,7 @@ rain_system = RainSystem()
 class Dog:
     def __init__(self, x, y):
         self.pos = [x, y]
-        self.size = 15  # fixed size
+        self.size = 20  # fixed size
 
     def update(self):
         # Simple random movement for dogs
@@ -1421,3 +1421,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
