@@ -23,6 +23,9 @@ HOUSE_POS = [0, 0]
 HOUSE_SIZE = 150
 DOOR_SIZE = 50
 
+# Game duration (5 minutes)
+game_duration = 300
+
 # Rain constants
 RAIN_MIN_INTERVAL = 8
 RAIN_MAX_INTERVAL = 15
@@ -30,13 +33,12 @@ RAIN_DURATION = 9
 RAIN_DAMAGE_TIME = 3
 RAIN_DAMAGE = 3
 
-# --- START NEW FEATURE: Snowfall Constants ---
+# --- SNOWFALL CONSTANTS ---
 SNOW_MIN_INTERVAL = 40
 SNOW_MAX_INTERVAL = 60
 SNOW_DURATION = 15
 SNOW_FALL_SPEED = 5
 SNOWFLAKES_COUNT = 200
-# --- END NEW FEATURE ---
 
 # Camera controls
 cam_angle = 0
@@ -55,12 +57,11 @@ keys = {}
 apples = []
 last_apple_time = time.time()
 
-# --- START NEW FEATURE: Snowfall State ---
+# --- SNOWFALL STATE ---
 snowflakes = []
 snow_start_time = 0
 snow_active = False
 snow_next_time = time.time() + random.randint(SNOW_MIN_INTERVAL, SNOW_MAX_INTERVAL)
-# --- END NEW FEATURE ---
 
 # --- CLASSES ---
 class Player:
@@ -72,6 +73,7 @@ class Player:
         self.alive = True
         self.health = 100
         self.under_shelter = False
+
 player = Player()
 
 class RainSystem:
@@ -81,13 +83,24 @@ class RainSystem:
         self.next_rain_time = time.time() + random.randint(RAIN_MIN_INTERVAL, RAIN_MAX_INTERVAL)
         self.player_rain_exposure_start = 0
         self.player_in_rain = False
+
 rain_system = RainSystem()
 
-# --- START NEW FEATURE: Dog Class with Detailed Body ---
+# --- DOG CLASS WITH DETAILED BODY ---
 class Dog:
     def __init__(self, x, y):
         self.pos = [x, y]
         self.size = random.uniform(40, 60)  # Big size varies a bit
+        
+    def update(self):
+        # Simple random movement for dogs
+        self.pos[0] += random.uniform(-2, 2)
+        self.pos[1] += random.uniform(-2, 2)
+        
+        # Keep dogs within world bounds
+        self.pos[0] = max(-WORLD_SIZE+100, min(WORLD_SIZE-100, self.pos[0]))
+        self.pos[1] = max(-WORLD_SIZE+100, min(WORLD_SIZE-100, self.pos[1]))
+        
     def draw(self):
         glPushMatrix()
         glTranslatef(self.pos[0], self.pos[1], 22)
@@ -130,27 +143,22 @@ class Dog:
         glutSolidCone(self.size * 0.2, self.size * 0.6, 6, 6)
         glPopMatrix()
         glPopMatrix()
-        
-        # for dog in dogs:
-        #     dog.update()
 
-# --- END NEW FEATURE ---
-
-# --- START NEW FEATURE: Create multiple dogs around the world ---
+# --- CREATE MULTIPLE DOGS AROUND THE WORLD ---
 dogs = []
 for _ in range(6):
     dogs.append(Dog(random.randint(-WORLD_SIZE+200, WORLD_SIZE-200), random.randint(-WORLD_SIZE+200, WORLD_SIZE-200)))
-# --- END NEW FEATURE ---
-
 
 class QuestNPC:
     def __init__(self):
         self.pos = [random.randint(-400, 400), random.randint(-400, 400), 0]
+
 quest_npc = QuestNPC()
 
 class ShopNPC:
     def __init__(self):
         self.pos = [random.randint(-450, 450), random.randint(-450, 450), 0]
+
 shop_npc = ShopNPC()
 
 # Generate random cloud positions
@@ -166,7 +174,7 @@ def generate_clouds():
             'drift_x': random.uniform(-0.5, 0.5),
             'drift_y': random.uniform(-0.5, 0.5)
         })
-1
+
 # Generate random star positions
 def generate_stars():
     global stars
@@ -239,23 +247,18 @@ for _ in range(SHELTER_COUNT):
         y = random.randint(-WORLD_SIZE+400, WORLD_SIZE-400)
         shelters.append([x, y])
 
-
 # --- DAY/NIGHT CYCLE FUNCTIONS ---
 def get_day_time():
     """Returns time of day as a value between 0 (midnight) and 1 (next midnight)"""
     elapsed = time.time() - game_start_time
     return (elapsed % day_cycle_duration) / day_cycle_duration
 
-
 def get_sky_color():
     """Returns sky color based on time of day"""
     day_time = get_day_time()
-
-    # Convert to hours (0-24)
     hour = day_time * 24
 
     if 5 <= hour < 7:  # Dawn
-        # Transition from dark to light
         t = (hour - 5) / 2
         r = 0.1 + t * 0.43
         g = 0.1 + t * 0.61
@@ -266,16 +269,13 @@ def get_sky_color():
         g = 0.71 + t * 0.10
         b = 0.92 + t * 0.0
     elif 8 <= hour < 17:  # Day
-        # Bright sky blue
         r, g, b = 0.53, 0.81, 0.92
     elif 17 <= hour < 19:  # Sunset
-        # Transition to orange/red
         t = (hour - 17) / 2
         r = 0.53 + t * 0.37
         g = 0.81 - t * 0.41
         b = 0.92 - t * 0.62
     elif 19 <= hour < 21:  # Dusk
-        # Transition to dark
         t = (hour - 19) / 2
         r = 0.9 - t * 0.6
         g = 0.4 - t * 0.2
@@ -286,7 +286,6 @@ def get_sky_color():
         g = 0.2 - t * 0.05
         b = 0.3 - t * 0.05
     else:  # Night (23-5)
-        # Dark sky
         r, g, b = 0.05, 0.05, 0.15
 
     # Darken sky during rain
@@ -296,7 +295,6 @@ def get_sky_color():
         b *= 0.4
 
     return r, g, b
-
 
 def get_ambient_light():
     """Returns ambient light intensity based on time of day"""
@@ -326,13 +324,11 @@ def get_ambient_light():
 
     return base_light
 
-
 def is_day_time():
     """Returns True if it's daytime (sun should be visible)"""
     day_time = get_day_time()
     hour = day_time * 24
     return 6 <= hour < 18
-
 
 def is_night_time():
     """Returns True if it's nighttime (moon and stars should be visible)"""
@@ -340,19 +336,16 @@ def is_night_time():
     hour = day_time * 24
     return hour >= 20 or hour < 6
 
-
 def get_sun_moon_position():
     """Calculate sun/moon position across the sky"""
     day_time = get_day_time()
-    # Sun/moon travels from east to west
-    angle = (day_time * 360) - 90  # Start from east
+    angle = (day_time * 360) - 90
 
     x = 1800 * math.cos(math.radians(angle))
     y = 0
     z = 800 + 400 * math.sin(math.radians(angle))
 
     return x, y, z
-
 
 # --- DRAWING FUNCTIONS ---
 def draw_clouds():
@@ -396,7 +389,6 @@ def draw_clouds():
 
         glPopMatrix()
 
-
 def draw_stars():
     """Draw stars in the night sky"""
     if not is_night_time():
@@ -417,17 +409,93 @@ def draw_stars():
         glutSolidSphere(3, 6, 6)
         glPopMatrix()
 
-# def draw_ground():
-#     # Apply lighting based on day/night cycle
-#     light_intensity = get_ambient_light()
-#     base_green = 0.6 * light_intensity
-#     glColor3f(0.2 * light_intensity, base_green, 0.2 * light_intensity)
-#     glBegin(GL_QUADS)
-#     glVertex3f(-WORLD_SIZE, -WORLD_SIZE, 0)
-#     glVertex3f(WORLD_SIZE, -WORLD_SIZE, 0)
-#     glVertex3f(WORLD_SIZE, WORLD_SIZE, 0)
-#     glVertex3f(-WORLD_SIZE, WORLD_SIZE, 0)
-#     glEnd()
+def draw_sun():
+    """Draw the sun during daytime"""
+    if not is_day_time():
+        return
+
+    x, y, z = get_sun_moon_position()
+
+    # Don't draw sun if it's below horizon
+    if z < 100:
+        return
+
+    glPushMatrix()
+    glTranslatef(player.pos[0] + x, player.pos[1] + y, z)
+
+    # Sun color - dimmer during rain
+    if rain_system.is_raining:
+        glColor3f(0.8, 0.7, 0.3)
+    else:
+        glColor3f(1.0, 1.0, 0.3)
+
+    # Draw sun
+    glutSolidSphere(100, 20, 20)
+
+    # Sun rays (only when not raining)
+    if not rain_system.is_raining:
+        glColor4f(1.0, 1.0, 0.5, 0.3)
+        for i in range(12):
+            angle = i * 30
+            glPushMatrix()
+            glRotatef(angle, 0, 0, 1)
+            glTranslatef(150, 0, 0)
+            glScalef(40, 8, 8)
+            glutSolidCube(1.0)
+            glPopMatrix()
+
+    glPopMatrix()
+
+def draw_moon():
+    """Draw the moon during nighttime"""
+    if not is_night_time():
+        return
+
+    x, y, z = get_sun_moon_position()
+
+    # Don't draw moon if it's below horizon
+    if z < 100:
+        return
+
+    glPushMatrix()
+    glTranslatef(player.pos[0] + x, player.pos[1] + y, z)
+
+    # Moon color
+    glColor3f(0.9, 0.9, 0.8)
+
+    # Draw moon
+    glutSolidSphere(80, 20, 20)
+
+    # Moon craters (darker spots)
+    glColor3f(0.7, 0.7, 0.6)
+    glPushMatrix()
+    glTranslatef(20, 20, 60)
+    glutSolidSphere(12, 8, 8)
+    glPopMatrix()
+
+    glPushMatrix()
+    glTranslatef(-15, 30, 65)
+    glutSolidSphere(8, 8, 8)
+    glPopMatrix()
+
+    glPushMatrix()
+    glTranslatef(35, -10, 55)
+    glutSolidSphere(6, 8, 8)
+    glPopMatrix()
+
+    glPopMatrix()
+
+def draw_ground():
+    # Apply lighting based on day/night cycle
+    light_intensity = get_ambient_light()
+    base_green = 0.6 * light_intensity
+    glColor3f(0.2 * light_intensity, base_green, 0.2 * light_intensity)
+    glBegin(GL_QUADS)
+    glVertex3f(-WORLD_SIZE, -WORLD_SIZE, 0)
+    glVertex3f(WORLD_SIZE, -WORLD_SIZE, 0)
+    glVertex3f(WORLD_SIZE, WORLD_SIZE, 0)
+    glVertex3f(-WORLD_SIZE, WORLD_SIZE, 0)
+    glEnd()
 
 def draw_house():
     light_intensity = get_ambient_light()
@@ -467,7 +535,7 @@ def draw_house():
         glPopMatrix()
     
     glPopMatrix()
-    
+
 def draw_tree(x, y):
     light_intensity = get_ambient_light()
     
@@ -520,117 +588,6 @@ def draw_text(x, y, text):
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
-
-# --- CAMERA SETUP ---
-def setup_camera():
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    gluPerspective(60, WINDOW_WIDTH / WINDOW_HEIGHT, 1.0, 5000)
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
-    
-    global cam_angle, cam_distance, cam_height
-    
-    if player.inside_house:
-        # Interior camera view
-        gluLookAt(HOUSE_POS[0], HOUSE_POS[1], 100, 
-                  HOUSE_POS[0], HOUSE_POS[1] - 50, 50, 
-                  0, 0, 1)
-    else:
-        # Third-person camera that follows player
-        camera_x = player.pos[0] - cam_distance * math.sin(math.radians(cam_angle))
-        camera_y = player.pos[1] - cam_distance * math.cos(math.radians(cam_angle))
-        gluLookAt(camera_x, camera_y, cam_height,
-                  player.pos[0], player.pos[1], 0,
-                  0, 0, 1)
-def draw_sun():
-    """Draw the sun during daytime"""
-    if not is_day_time():
-        return
-
-    x, y, z = get_sun_moon_position()
-
-    # Don't draw sun if it's below horizon
-    if z < 100:
-        return
-
-    glPushMatrix()
-    glTranslatef(player.pos[0] + x, player.pos[1] + y, z)
-
-    # Sun color - dimmer during rain
-    if rain_system.is_raining:
-        glColor3f(0.8, 0.7, 0.3)
-    else:
-        glColor3f(1.0, 1.0, 0.3)
-
-    # Draw sun
-    glutSolidSphere(100, 20, 20)
-
-    # Sun rays (only when not raining)
-    if not rain_system.is_raining:
-        glColor4f(1.0, 1.0, 0.5, 0.3)
-        for i in range(12):
-            angle = i * 30
-            glPushMatrix()
-            glRotatef(angle, 0, 0, 1)
-            glTranslatef(150, 0, 0)
-            glScalef(40, 8, 8)
-            glutSolidCube(1.0)
-            glPopMatrix()
-
-    glPopMatrix()
-
-
-def draw_moon():
-    """Draw the moon during nighttime"""
-    if not is_night_time():
-        return
-
-    x, y, z = get_sun_moon_position()
-
-    # Don't draw moon if it's below horizon
-    if z < 100:
-        return
-
-    glPushMatrix()
-    glTranslatef(player.pos[0] + x, player.pos[1] + y, z)
-
-    # Moon color
-    glColor3f(0.9, 0.9, 0.8)
-
-    # Draw moon
-    glutSolidSphere(80, 20, 20)
-
-    # Moon craters (darker spots)
-    glColor3f(0.7, 0.7, 0.6)
-    glPushMatrix()
-    glTranslatef(20, 20, 60)
-    glutSolidSphere(12, 8, 8)
-    glPopMatrix()
-
-    glPushMatrix()
-    glTranslatef(-15, 30, 65)
-    glutSolidSphere(8, 8, 8)
-    glPopMatrix()
-
-    glPushMatrix()
-    glTranslatef(35, -10, 55)
-    glutSolidSphere(6, 8, 8)
-    glPopMatrix()
-
-    glPopMatrix()
-
-def draw_ground():
-    # Apply lighting based on day/night cycle
-    light_intensity = get_ambient_light()
-    base_green = 0.6 * light_intensity
-    glColor3f(0.2 * light_intensity, base_green, 0.2 * light_intensity)
-    glBegin(GL_QUADS)
-    glVertex3f(-WORLD_SIZE, -WORLD_SIZE, 0)
-    glVertex3f(WORLD_SIZE, -WORLD_SIZE, 0)
-    glVertex3f(WORLD_SIZE, WORLD_SIZE, 0)
-    glVertex3f(-WORLD_SIZE, WORLD_SIZE, 0)
-    glEnd()
 
 def draw_shelter(x, y):
     """Draw a shelter with roof and support posts"""
@@ -708,7 +665,6 @@ def draw_boundary_walls():
     glScalef(wall_thickness, WORLD_SIZE * 2, wall_height)
     glutSolidCube(1.0)
     glPopMatrix()
-############################
 
 def draw_rain():
     """Draw rain particles"""
@@ -730,10 +686,8 @@ def draw_rain():
         glVertex3f(x + 2, y + 2, z_bottom)
 
     glEnd()
-###############################################
 
-### --- START NEW FEATURE: Snowfall Implementation ---
-
+# --- SNOWFALL IMPLEMENTATION ---
 def init_snowflakes():
     global snowflakes
     snowflakes.clear()
@@ -745,8 +699,6 @@ def init_snowflakes():
             'size': random.uniform(4, 8),
             'speed': random.uniform(SNOW_FALL_SPEED * 0.8, SNOW_FALL_SPEED * 1.2)
         })
-
-init_snowflakes()
 
 def update_snow():
     global snow_active, snow_start_time, snow_next_time
@@ -785,8 +737,6 @@ def draw_snow():
     for flake in snowflakes:
         glVertex3f(flake['x'], flake['y'], flake['z'])
     glEnd()
-
-### --- END NEW FEATURE ---
 
 def draw_player():
     if player.inside_house:
@@ -901,11 +851,9 @@ def draw_player():
 
     glPopMatrix()
 
-
 def draw_dogs():
     for dog in dogs:
         dog.draw()
-
 
 def draw_npc():
     glPushMatrix()
@@ -920,7 +868,6 @@ def draw_npc():
     glPopMatrix()
     glPopMatrix()
 
-
 def draw_shop():
     glPushMatrix()
     glTranslatef(shop_npc.pos[0], shop_npc.pos[1], 39)
@@ -934,6 +881,28 @@ def draw_shop():
     glPopMatrix()
     glPopMatrix()
 
+# --- CAMERA SETUP ---
+def setup_camera():
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluPerspective(60, WINDOW_WIDTH / WINDOW_HEIGHT, 1.0, 5000)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
+    
+    global cam_angle, cam_distance, cam_height
+    
+    if player.inside_house:
+        # Interior camera view
+        gluLookAt(HOUSE_POS[0], HOUSE_POS[1], 100, 
+                  HOUSE_POS[0], HOUSE_POS[1] - 50, 50, 
+                  0, 0, 1)
+    else:
+        # Third-person camera that follows player
+        camera_x = player.pos[0] - cam_distance * math.sin(math.radians(cam_angle))
+        camera_y = player.pos[1] - cam_distance * math.cos(math.radians(cam_angle))
+        gluLookAt(camera_x, camera_y, cam_height,
+                  player.pos[0], player.pos[1], 0,
+                  0, 0, 1)
 
 def draw_scene():
     r, g, b = get_sky_color()
@@ -943,9 +912,9 @@ def draw_scene():
     setup_camera()
 
     draw_stars()
-    draw_clouds()
+    # Removed: draw_clouds()
     draw_sun()
-    draw_moon()
+    # Removed: draw_moon()
 
     draw_ground()
     draw_boundary_walls()
@@ -968,32 +937,32 @@ def draw_scene():
         for apple in apples:
             draw_apple(apple)
 
-    check_dog_collisions()
-
     # Display UI text
-    day_time = get_day_time()
-    hour = int(day_time * 24)
-    minute = int((day_time * 24 * 60) % 60)
-    time_str = f"{hour:02d}:{minute:02d}"
+    elapsed_time = time.time() - game_start_time
+    remaining_time = max(0, game_duration - elapsed_time)
+    minutes = int(remaining_time // 60)
+    seconds = int(remaining_time % 60)
+    time_remaining_str = f"{minutes}:{seconds:02d}"
 
     if not player.alive:
-        msg = f"GAME OVER! Score: {player.score}. Press 'r' to restart."
+        if elapsed_time >= game_duration:
+            msg = f"TIME UP! Final Score: {player.score}. Press 'r' to restart."
+        else:
+            msg = f"GAME OVER! Score: {player.score}. Press 'r' to restart."
     elif player.inside_house:
-        msg = f"Inside house! Press 'e' to exit. Score: {player.score} | Health: {player.health} | Time: {time_str}"
+        msg = f"Inside house! Press 'e' to exit. Score: {player.score} | Health: {player.health} | Time Left: {time_remaining_str}"
     else:
         shelter_status = " [Under Shelter]" if player.under_shelter else ""
         rain_status = " [RAINING!]" if rain_system.is_raining else ""
         snow_status = " [SNOWING!]" if snow_active else ""
-        msg = f"Catch red/golden apples (+5/+20), avoid black (-10). Score: {player.score} | Health: {player.health} | Time: {time_str}{shelter_status}{rain_status}{snow_status} "
+        msg = f"Catch red/golden apples (+5/+20), avoid black (-10). Score: {player.score} | Health: {player.health} | Time Left: {time_remaining_str}{shelter_status}{rain_status}{snow_status}"
 
     draw_text(20, WINDOW_HEIGHT - 40, msg)
-    draw_text(20, WINDOW_HEIGHT - 70, "[WASD] Move (with left/right)  [Arrows] Rotate  [E] Enter/Leave house  [R] Restart")
+    draw_text(20, WINDOW_HEIGHT - 70, "[WASD] Move  [Arrows] Rotate  [E] Enter/Leave house  [R] Restart")
 
     glutSwapBuffers()
 
-#######################################
-
-# --- GAME LOGIC & LOOP MODIFIED FOR DOG COLLISIONS ---
+# --- GAME LOGIC & UPDATES ---
 def check_dog_collisions():
     if not player.alive:
         return
@@ -1001,8 +970,8 @@ def check_dog_collisions():
         dx = player.pos[0] - dog.pos[0]
         dy = player.pos[1] - dog.pos[1]
         dist = math.sqrt(dx*dx + dy*dy)
-        if dist < dog.size + 25:  # collision threshold approx dog size + player radius
-            player.score += 0.5  # Fixed: changed from +10 to +0.5
+        if dist < dog.size + 25:  # collision threshold
+            player.score += 0.5
             # Push dog away randomly to prevent multiple counts rapidly
             dog.pos[0] += random.choice([-1, 1]) * dog.size * 2
             dog.pos[1] += random.choice([-1, 1]) * dog.size * 2
@@ -1010,7 +979,8 @@ def check_dog_collisions():
 def check_shelter_protection():
     player.under_shelter = False
     for shelter_x, shelter_y in shelters:
-        if (shelter_x-74<player.pos[0]<shelter_x+74 and shelter_y-74<player.pos[1]<shelter_y+74):
+        if (shelter_x-74 < player.pos[0] < shelter_x+74 and 
+            shelter_y-74 < player.pos[1] < shelter_y+74):
             player.under_shelter = True
             break
 
@@ -1034,6 +1004,7 @@ def update_rain():
         rain_system.is_raining = False
         rain_system.player_in_rain = False
         rain_system.player_rain_exposure_start = 0
+        
     if rain_system.is_raining and not player.inside_house and not player.under_shelter and player.alive:
         if not rain_system.player_in_rain:
             rain_system.player_in_rain = True
@@ -1093,7 +1064,7 @@ def update_apples():
             elif apple['type'] == "black":
                 player.score -= 10
             elif apple['type'] == "golden":
-                player.score += 20  # bigger reward for golden apple
+                player.score += 20
 
             apples.remove(apple)
 
@@ -1113,22 +1084,22 @@ def update_player():
     new_x, new_y = player.pos[0], player.pos[1]
     
     # Full 4-direction movement (WASD)
-    if keys.get(b'w',False):
+    if keys.get(b'w', False):
         new_x += PLAYER_SPEED * math.sin(math.radians(rot_angle))
         new_y += PLAYER_SPEED * math.cos(math.radians(rot_angle))
-    if keys.get(b's',False):
+    if keys.get(b's', False):
         new_x -= PLAYER_SPEED * math.sin(math.radians(rot_angle))
         new_y -= PLAYER_SPEED * math.cos(math.radians(rot_angle))
-    if keys.get(b'a',False):
+    if keys.get(b'a', False):
         new_x -= PLAYER_SPEED * math.cos(math.radians(rot_angle))
         new_y += PLAYER_SPEED * math.sin(math.radians(rot_angle))
-    if keys.get(b'd',False):
+    if keys.get(b'd', False):
         new_x += PLAYER_SPEED * math.cos(math.radians(rot_angle))
         new_y -= PLAYER_SPEED * math.sin(math.radians(rot_angle))
     
     # Bound check
-    new_x = max(-WORLD_SIZE+35,min(WORLD_SIZE-35,new_x))
-    new_y = max(-WORLD_SIZE+35,min(WORLD_SIZE-35,new_y))
+    new_x = max(-WORLD_SIZE+35, min(WORLD_SIZE-35, new_x))
+    new_y = max(-WORLD_SIZE+35, min(WORLD_SIZE-35, new_y))
     
     # Simple collision check with house
     house_left = HOUSE_POS[0]-HOUSE_SIZE//2
@@ -1141,18 +1112,23 @@ def update_player():
         if math.sqrt((new_x-door_x)**2 + (new_y-door_y)**2) > 59: 
             return
     
-    player.pos[0],player.pos[1] = new_x,new_y
+    player.pos[0], player.pos[1] = new_x, new_y
     check_shelter_protection()
 
-# Fixed keyboard handler to properly handle 'e' key
+def update_dogs():
+    for dog in dogs:
+        dog.update()
+
 def keyboard_down(key, x, y):
     keys[key] = True
     
-    # Fixed house entry - removed duplicate logic
     if key == b'e':
         check_house_entry()
     
     if key == b'r' and not player.alive:
+        # Reset game
+        global game_start_time
+        game_start_time = time.time()
         player.__init__()
         rain_system.__init__()
         apples.clear()
@@ -1164,7 +1140,9 @@ def keyboard_down(key, x, y):
         global dogs
         dogs = []
         for _ in range(6):
-            dogs.append(Dog(random.randint(-WORLD_SIZE+200, WORLD_SIZE-200), random.randint(-WORLD_SIZE+200, WORLD_SIZE-200)))
+            dogs.append(Dog(random.randint(-WORLD_SIZE+200, WORLD_SIZE-200), 
+                           random.randint(-WORLD_SIZE+200, WORLD_SIZE-200)))
+        init_snowflakes()
         glutPostRedisplay()
     
     glutPostRedisplay()
@@ -1193,7 +1171,7 @@ def check_house_entry():
         player.pos[0] = door_x
         player.pos[1] = door_y - 80
 
-def special_key_down(key,x,y):
+def special_key_down(key, x, y):
     global cam_angle, cam_height
     if key == GLUT_KEY_LEFT: 
         player.angle += TURN_SPEED
@@ -1202,18 +1180,27 @@ def special_key_down(key,x,y):
     elif key == GLUT_KEY_UP: 
         cam_height = min(cam_height+35, 610)
     elif key == GLUT_KEY_DOWN: 
-        cam_height = max(cam_height-35,120)
+        cam_height = max(cam_height-35, 120)
     player.angle %= 360
     glutPostRedisplay()
 
 def update_game(value):
+    if player.alive:
+        elapsed_time = time.time() - game_start_time
+        if elapsed_time >= game_duration:
+            player.alive = False
+    
     update_player()
     update_apples()
     update_rain()
     update_snow()
+    update_dogs()
     check_dog_collisions()
     glutPostRedisplay()
     glutTimerFunc(16, update_game, 0)
+
+# Initialize snowflakes on startup
+init_snowflakes()
 
 # --- MAIN FUNCTION ---
 def main():
@@ -1234,7 +1221,6 @@ def main():
     glutTimerFunc(0, update_game, 0)
 
     glutMainLoop()
-
 
 if __name__ == "__main__":
     main()
