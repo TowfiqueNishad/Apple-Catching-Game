@@ -6,6 +6,7 @@ import math
 import random
 import time
 
+
 # --- CONSTANTS ---
 WINDOW_WIDTH, WINDOW_HEIGHT = 1200, 800
 WORLD_SIZE = 2000
@@ -22,6 +23,8 @@ TURN_SPEED = 5  # Character rotation speed
 HOUSE_POS = [0, 0]
 HOUSE_SIZE = 150
 DOOR_SIZE = 50
+
+SHOP_SIZE = 100  # dimension of shop square
 
 # Game duration (5 minutes)
 game_duration = 300
@@ -63,18 +66,23 @@ snow_start_time = 0
 snow_active = False
 snow_next_time = time.time() + random.randint(SNOW_MIN_INTERVAL, SNOW_MAX_INTERVAL)
 
+
 # --- CLASSES ---
 class Player:
     def __init__(self):
         self.pos = [100, 100, 0]
         self.angle = 0
         self.inside_house = False
+        self.inside_shop = False
         self.score = 0
         self.alive = True
         self.health = 100
         self.under_shelter = False
+        self.won = False
+
 
 player = Player()
+
 
 class RainSystem:
     def __init__(self):
@@ -84,23 +92,25 @@ class RainSystem:
         self.player_rain_exposure_start = 0
         self.player_in_rain = False
 
+
 rain_system = RainSystem()
 
-# --- DOG CLASS WITH DETAILED BODY ---
+
+# --- DOG CLASS WITH FIXED SIZE 4 ---
 class Dog:
     def __init__(self, x, y):
         self.pos = [x, y]
-        self.size = random.uniform(40, 60)  # Big size varies a bit
-        
+        self.size = 15  # fixed size
+
     def update(self):
         # Simple random movement for dogs
         self.pos[0] += random.uniform(-2, 2)
         self.pos[1] += random.uniform(-2, 2)
-        
+
         # Keep dogs within world bounds
-        self.pos[0] = max(-WORLD_SIZE+100, min(WORLD_SIZE-100, self.pos[0]))
-        self.pos[1] = max(-WORLD_SIZE+100, min(WORLD_SIZE-100, self.pos[1]))
-        
+        self.pos[0] = max(-WORLD_SIZE + 100, min(WORLD_SIZE - 100, self.pos[0]))
+        self.pos[1] = max(-WORLD_SIZE + 100, min(WORLD_SIZE - 100, self.pos[1]))
+
     def draw(self):
         glPushMatrix()
         glTranslatef(self.pos[0], self.pos[1], 22)
@@ -129,8 +139,8 @@ class Dog:
         glPopMatrix()
         glPopMatrix()  # head
         # Legs (4 legs)
-        for dx, dy in [(-self.size*0.4, -self.size*0.3), (self.size*0.4, -self.size*0.3),
-                       (-self.size*0.4, self.size*0.3), (self.size*0.4, self.size*0.3)]:
+        for dx, dy in [(-self.size * 0.4, -self.size * 0.3), (self.size * 0.4, -self.size * 0.3),
+                       (-self.size * 0.4, self.size * 0.3), (self.size * 0.4, self.size * 0.3)]:
             glPushMatrix()
             glTranslatef(dx, dy, -self.size * 0.5)
             glScalef(self.size * 0.15, self.size * 0.15, self.size * 0.75)
@@ -144,22 +154,28 @@ class Dog:
         glPopMatrix()
         glPopMatrix()
 
+
 # --- CREATE MULTIPLE DOGS AROUND THE WORLD ---
 dogs = []
 for _ in range(6):
-    dogs.append(Dog(random.randint(-WORLD_SIZE+200, WORLD_SIZE-200), random.randint(-WORLD_SIZE+200, WORLD_SIZE-200)))
+    dogs.append(Dog(random.randint(-WORLD_SIZE + 200, WORLD_SIZE - 200), random.randint(-WORLD_SIZE + 200, WORLD_SIZE - 200)))
+
 
 class QuestNPC:
     def __init__(self):
         self.pos = [random.randint(-400, 400), random.randint(-400, 400), 0]
 
+
 quest_npc = QuestNPC()
+
 
 class ShopNPC:
     def __init__(self):
         self.pos = [random.randint(-450, 450), random.randint(-450, 450), 0]
 
+
 shop_npc = ShopNPC()
+
 
 # Generate random cloud positions
 def generate_clouds():
@@ -175,6 +191,7 @@ def generate_clouds():
             'drift_y': random.uniform(-0.5, 0.5)
         })
 
+
 # Generate random star positions
 def generate_stars():
     global stars
@@ -188,20 +205,23 @@ def generate_stars():
             'twinkle_speed': random.uniform(2, 8)
         })
 
+
 # Initialize sky features
 generate_clouds()
 generate_stars()
+
 
 # Generate random tree positions (avoid house area)
 trees = []
 for _ in range(TREE_COUNT):
     while True:
-        x = random.randint(-WORLD_SIZE+200, WORLD_SIZE-200)
-        y = random.randint(-WORLD_SIZE+200, WORLD_SIZE-200)
+        x = random.randint(-WORLD_SIZE + 200, WORLD_SIZE - 200)
+        y = random.randint(-WORLD_SIZE + 200, WORLD_SIZE - 200)
         # Make sure trees are not too close to house
         if abs(x - HOUSE_POS[0]) > HOUSE_SIZE + 100 or abs(y - HOUSE_POS[1]) > HOUSE_SIZE + 100:
             trees.append([x, y])
             break
+
 
 # Generate random shelter positions
 shelters = []
@@ -209,20 +229,20 @@ max_attempts = 100  # Prevent infinite loops
 for _ in range(SHELTER_COUNT):
     attempts = 0
     while attempts < max_attempts:
-        x = random.randint(-WORLD_SIZE+400, WORLD_SIZE-400)
-        y = random.randint(-WORLD_SIZE+400, WORLD_SIZE-400)
+        x = random.randint(-WORLD_SIZE + 400, WORLD_SIZE - 400)
+        y = random.randint(-WORLD_SIZE + 400, WORLD_SIZE - 400)
         # Make sure shelters are not too close to house or trees
         valid_position = True
 
         # Check distance from house (reduced requirement)
-        house_dist = math.sqrt((x - HOUSE_POS[0])**2 + (y - HOUSE_POS[1])**2)
+        house_dist = math.sqrt((x - HOUSE_POS[0]) ** 2 + (y - HOUSE_POS[1]) ** 2)
         if house_dist < HOUSE_SIZE + 150:
             valid_position = False
 
         # Check distance from trees (reduced requirement)
         if valid_position:
             for tree_x, tree_y in trees:
-                tree_dist = math.sqrt((x - tree_x)**2 + (y - tree_y)**2)
+                tree_dist = math.sqrt((x - tree_x) ** 2 + (y - tree_y) ** 2)
                 if tree_dist < 200:
                     valid_position = False
                     break
@@ -230,7 +250,7 @@ for _ in range(SHELTER_COUNT):
         # Check distance from other shelters (reduced requirement)
         if valid_position:
             for shelter_x, shelter_y in shelters:
-                shelter_dist = math.sqrt((x - shelter_x)**2 + (y - shelter_y)**2)
+                shelter_dist = math.sqrt((x - shelter_x) ** 2 + (y - shelter_y) ** 2)
                 if shelter_dist < 250:
                     valid_position = False
                     break
@@ -243,15 +263,17 @@ for _ in range(SHELTER_COUNT):
 
     # If we couldn't find a valid position after max_attempts, place it anyway
     if attempts >= max_attempts:
-        x = random.randint(-WORLD_SIZE+400, WORLD_SIZE-400)
-        y = random.randint(-WORLD_SIZE+400, WORLD_SIZE-400)
+        x = random.randint(-WORLD_SIZE + 400, WORLD_SIZE - 400)
+        y = random.randint(-WORLD_SIZE + 400, WORLD_SIZE - 400)
         shelters.append([x, y])
+
 
 # --- DAY/NIGHT CYCLE FUNCTIONS ---
 def get_day_time():
     """Returns time of day as a value between 0 (midnight) and 1 (next midnight)"""
     elapsed = time.time() - game_start_time
     return (elapsed % day_cycle_duration) / day_cycle_duration
+
 
 def get_sky_color():
     """Returns sky color based on time of day"""
@@ -296,6 +318,7 @@ def get_sky_color():
 
     return r, g, b
 
+
 def get_ambient_light():
     """Returns ambient light intensity based on time of day"""
     day_time = get_day_time()
@@ -324,17 +347,20 @@ def get_ambient_light():
 
     return base_light
 
+
 def is_day_time():
     """Returns True if it's daytime (sun should be visible)"""
     day_time = get_day_time()
     hour = day_time * 24
     return 6 <= hour < 18
 
+
 def is_night_time():
     """Returns True if it's nighttime (moon and stars should be visible)"""
     day_time = get_day_time()
     hour = day_time * 24
     return hour >= 20 or hour < 6
+
 
 def get_sun_moon_position():
     """Calculate sun/moon position across the sky"""
@@ -346,6 +372,7 @@ def get_sun_moon_position():
     z = 800 + 400 * math.sin(math.radians(angle))
 
     return x, y, z
+
 
 # --- DRAWING FUNCTIONS ---
 def draw_clouds():
@@ -389,6 +416,7 @@ def draw_clouds():
 
         glPopMatrix()
 
+
 def draw_stars():
     """Draw stars in the night sky"""
     if not is_night_time():
@@ -408,6 +436,7 @@ def draw_stars():
         # Draw star as a small bright sphere
         glutSolidSphere(3, 6, 6)
         glPopMatrix()
+
 
 def draw_sun():
     """Draw the sun during daytime"""
@@ -445,6 +474,7 @@ def draw_sun():
             glPopMatrix()
 
     glPopMatrix()
+
 
 def draw_moon():
     """Draw the moon during nighttime"""
@@ -485,6 +515,7 @@ def draw_moon():
 
     glPopMatrix()
 
+
 def draw_ground():
     # Apply lighting based on day/night cycle
     light_intensity = get_ambient_light()
@@ -497,51 +528,53 @@ def draw_ground():
     glVertex3f(-WORLD_SIZE, WORLD_SIZE, 0)
     glEnd()
 
+
 def draw_house():
     light_intensity = get_ambient_light()
-    
+
     glPushMatrix()
     glTranslatef(HOUSE_POS[0], HOUSE_POS[1], 0)
-    
+
     # House walls (square box)
     glColor3f(0.7 * light_intensity, 0.5 * light_intensity, 0.3 * light_intensity)
     glPushMatrix()
-    glTranslatef(0, 0, HOUSE_SIZE//2)
+    glTranslatef(0, 0, HOUSE_SIZE // 2)
     glScalef(HOUSE_SIZE, HOUSE_SIZE, HOUSE_SIZE)
     glutSolidCube(1.0)
     glPopMatrix()
-    
+
     # Door opening (cut out from front wall)
     glColor3f(0.0, 0.0, 0.0)  # Black for door opening
     glPushMatrix()
-    glTranslatef(0, -HOUSE_SIZE//2 + 5, DOOR_SIZE//2)
+    glTranslatef(0, -HOUSE_SIZE // 2 + 5, DOOR_SIZE // 2)
     glScalef(DOOR_SIZE, 10, DOOR_SIZE)
     glutSolidCube(1.0)
     glPopMatrix()
-    
+
     # Add window lights during night
     if light_intensity < 0.6:
         glColor3f(1.0, 1.0, 0.8)  # Warm light
         glPushMatrix()
-        glTranslatef(30, -HOUSE_SIZE//2 + 2, 80)
+        glTranslatef(30, -HOUSE_SIZE // 2 + 2, 80)
         glScalef(20, 5, 20)
         glutSolidCube(1.0)
         glPopMatrix()
-        
+
         glPushMatrix()
-        glTranslatef(-30, -HOUSE_SIZE//2 + 2, 80)
+        glTranslatef(-30, -HOUSE_SIZE // 2 + 2, 80)
         glScalef(20, 5, 20)
         glutSolidCube(1.0)
         glPopMatrix()
-    
+
     glPopMatrix()
+
 
 def draw_tree(x, y):
     light_intensity = get_ambient_light()
-    
+
     glPushMatrix()
     glTranslatef(x, y, 0)
-    
+
     # Tree trunk
     glColor3f(0.4 * light_intensity, 0.2 * light_intensity, 0.1 * light_intensity)
     glPushMatrix()
@@ -549,17 +582,18 @@ def draw_tree(x, y):
     glScalef(5, 5, 20)
     glutSolidCube(10)
     glPopMatrix()
-    
+
     # Tree foliage
     glColor3f(0.1 * light_intensity, 0.5 * light_intensity, 0.1 * light_intensity)
     glTranslatef(0, 0, 250)
     glutSolidSphere(150, 20, 20)
-    
+
     glPopMatrix()
+
 
 def draw_apple(apple):
     light_intensity = get_ambient_light()
-    
+
     glPushMatrix()
     x, y, z = apple['pos']
     glTranslatef(x, y, z)
@@ -571,6 +605,7 @@ def draw_apple(apple):
         glColor3f(0.2 * light_intensity, 0.2 * light_intensity, 0.2 * light_intensity)
     glutSolidSphere(APPLE_RADIUS, 10, 10)
     glPopMatrix()
+
 
 def draw_text(x, y, text):
     glMatrixMode(GL_PROJECTION)
@@ -588,6 +623,7 @@ def draw_text(x, y, text):
     glMatrixMode(GL_PROJECTION)
     glPopMatrix()
     glMatrixMode(GL_MODELVIEW)
+
 
 def draw_shelter(x, y):
     """Draw a shelter with roof and support posts"""
@@ -630,41 +666,43 @@ def draw_shelter(x, y):
 
     glPopMatrix()
 
+
 def draw_boundary_walls():
     """Draw walls around the world boundary"""
     light_intensity = get_ambient_light()
     wall_height = 200
     wall_thickness = 50
-    
+
     glColor3f(0.4 * light_intensity, 0.4 * light_intensity, 0.4 * light_intensity)
-    
+
     # North wall
     glPushMatrix()
-    glTranslatef(0, WORLD_SIZE - wall_thickness//2, wall_height//2)
+    glTranslatef(0, WORLD_SIZE - wall_thickness // 2, wall_height // 2)
     glScalef(WORLD_SIZE * 2, wall_thickness, wall_height)
     glutSolidCube(1.0)
     glPopMatrix()
-    
+
     # South wall
     glPushMatrix()
-    glTranslatef(0, -WORLD_SIZE + wall_thickness//2, wall_height//2)
+    glTranslatef(0, -WORLD_SIZE + wall_thickness // 2, wall_height // 2)
     glScalef(WORLD_SIZE * 2, wall_thickness, wall_height)
     glutSolidCube(1.0)
     glPopMatrix()
-    
+
     # East wall
     glPushMatrix()
-    glTranslatef(WORLD_SIZE - wall_thickness//2, 0, wall_height//2)
+    glTranslatef(WORLD_SIZE - wall_thickness // 2, 0, wall_height // 2)
     glScalef(wall_thickness, WORLD_SIZE * 2, wall_height)
     glutSolidCube(1.0)
     glPopMatrix()
-    
+
     # West wall
     glPushMatrix()
-    glTranslatef(-WORLD_SIZE + wall_thickness//2, 0, wall_height//2)
+    glTranslatef(-WORLD_SIZE + wall_thickness // 2, 0, wall_height // 2)
     glScalef(wall_thickness, WORLD_SIZE * 2, wall_height)
     glutSolidCube(1.0)
     glPopMatrix()
+
 
 def draw_rain():
     """Draw rain particles"""
@@ -687,6 +725,7 @@ def draw_rain():
 
     glEnd()
 
+
 # --- SNOWFALL IMPLEMENTATION ---
 def init_snowflakes():
     global snowflakes
@@ -700,21 +739,22 @@ def init_snowflakes():
             'speed': random.uniform(SNOW_FALL_SPEED * 0.8, SNOW_FALL_SPEED * 1.2)
         })
 
+
 def update_snow():
     global snow_active, snow_start_time, snow_next_time
     now = time.time()
-    
+
     # Don't start snow if it's raining
     if not snow_active and now >= snow_next_time and not rain_system.is_raining:
         snow_active = True
         snow_start_time = now
-    
+
     # Stop snow if rain starts
     if snow_active and rain_system.is_raining:
         snow_active = False
         snow_next_time = now + random.randint(SNOW_MIN_INTERVAL, SNOW_MAX_INTERVAL)
         init_snowflakes()
-    
+
     if snow_active:
         if now - snow_start_time > SNOW_DURATION:
             snow_active = False
@@ -728,18 +768,20 @@ def update_snow():
                     flake['x'] = player.pos[0] + random.uniform(-WORLD_SIZE, WORLD_SIZE)
                     flake['y'] = player.pos[1] + random.uniform(-WORLD_SIZE, WORLD_SIZE)
 
+
 def draw_snow():
     if not snow_active:
         return
-    glPointSize(7)
+    glPointSize(5)
     glColor4f(1.0, 1.0, 1.0, 0.8)
     glBegin(GL_POINTS)
     for flake in snowflakes:
         glVertex3f(flake['x'], flake['y'], flake['z'])
     glEnd()
 
+
 def draw_player():
-    if player.inside_house:
+    if player.inside_house or player.inside_shop:
         return
 
     px, py, pz = player.pos
@@ -851,9 +893,11 @@ def draw_player():
 
     glPopMatrix()
 
+
 def draw_dogs():
     for dog in dogs:
         dog.draw()
+
 
 def draw_npc():
     glPushMatrix()
@@ -868,6 +912,7 @@ def draw_npc():
     glPopMatrix()
     glPopMatrix()
 
+
 def draw_shop():
     glPushMatrix()
     glTranslatef(shop_npc.pos[0], shop_npc.pos[1], 39)
@@ -881,6 +926,69 @@ def draw_shop():
     glPopMatrix()
     glPopMatrix()
 
+def draw_shop_building():
+    light_intensity = get_ambient_light()
+    glPushMatrix()
+    glTranslatef(shop_npc.pos[0], shop_npc.pos[1], 50)  # raise half height to stand on ground
+    glColor3f(0.7 * light_intensity, 0.4 * light_intensity, 0.2 * light_intensity)
+    glScalef(SHOP_SIZE, SHOP_SIZE, 100)
+    glutSolidCube(1.0)
+    glPopMatrix()
+
+
+def draw_shop_interior():
+    if not player.inside_shop:
+        return
+
+    light_intensity = get_ambient_light()
+
+    glPushMatrix()
+    glTranslatef(shop_npc.pos[0], shop_npc.pos[1], 0)
+
+    # Draw shop walls (simple cube)
+    glColor3f(0.8 * light_intensity, 0.7 * light_intensity, 0.5 * light_intensity)
+    glPushMatrix()
+    glTranslatef(0, 0, 50)
+    glScalef(SHOP_SIZE, SHOP_SIZE, 100)
+    glutWireCube(1.0)
+    glPopMatrix()
+
+    # Draw buckets full of apples inside the shop (several buckets)
+    bucket_positions = [(-20, -20), (20, -20), (-20, 20), (20, 20)]
+    for bx, by in bucket_positions:
+        glPushMatrix()
+        glTranslatef(bx, by, 25)
+        glColor3f(0.5, 0.35, 0.1)  # bucket color
+        glScalef(1, 1, 0.5)
+        glutSolidCube(20)  # bucket base
+        glPopMatrix()
+
+        # Draw some apples in bucket
+        glPushMatrix()
+        glTranslatef(bx, by, 40)
+        for i in range(3):
+            glPushMatrix()
+            glTranslatef(-5 + i * 5, 0, 0)
+            glColor3f(1, 0, 0)  # red apples
+            glutSolidSphere(5, 10, 10)
+            glPopMatrix()
+        glPopMatrix()
+
+    # Draw the shopkeeper (simple person near center)
+    glPushMatrix()
+    glTranslatef(0, 0, 37)
+    glColor3f(0.9, 0.6, 0.3)
+    glutSolidSphere(15, 12, 12)  # body
+    glPushMatrix()
+    glTranslatef(0, 0, 18)
+    glColor3f(1, 0.8, 0.6)
+    glutSolidSphere(8, 10, 10)  # head
+    glPopMatrix()
+    glPopMatrix()
+
+    glPopMatrix()
+
+
 # --- CAMERA SETUP ---
 def setup_camera():
     glMatrixMode(GL_PROJECTION)
@@ -888,14 +996,19 @@ def setup_camera():
     gluPerspective(60, WINDOW_WIDTH / WINDOW_HEIGHT, 1.0, 5000)
     glMatrixMode(GL_MODELVIEW)
     glLoadIdentity()
-    
+
     global cam_angle, cam_distance, cam_height
-    
+
     if player.inside_house:
         # Interior camera view
-        gluLookAt(HOUSE_POS[0], HOUSE_POS[1], 100, 
-                  HOUSE_POS[0], HOUSE_POS[1] - 50, 50, 
+        gluLookAt(HOUSE_POS[0], HOUSE_POS[1], 100,
+                  HOUSE_POS[0], HOUSE_POS[1] - 50, 50,
                   0, 0, 1)
+    elif player.inside_shop:
+        # Interior shop camera view
+        gluLookAt(shop_npc.pos[0], shop_npc.pos[1], 80,
+                  shop_npc.pos[0], shop_npc.pos[1], 0,
+                  0, 1, 0)
     else:
         # Third-person camera that follows player
         camera_x = player.pos[0] - cam_distance * math.sin(math.radians(cam_angle))
@@ -903,6 +1016,7 @@ def setup_camera():
         gluLookAt(camera_x, camera_y, cam_height,
                   player.pos[0], player.pos[1], 0,
                   0, 0, 1)
+
 
 def draw_scene():
     r, g, b = get_sky_color()
@@ -919,6 +1033,7 @@ def draw_scene():
     draw_ground()
     draw_boundary_walls()
     draw_house()
+    draw_shop_building()  # <- newly added building visible
 
     for shelter in shelters:
         draw_shelter(shelter[0], shelter[1])
@@ -932,8 +1047,9 @@ def draw_scene():
     draw_dogs()
     draw_npc()
     draw_shop()
+    draw_shop_interior()
 
-    if not player.inside_house:
+    if not player.inside_house and not player.inside_shop:
         for apple in apples:
             draw_apple(apple)
 
@@ -944,13 +1060,17 @@ def draw_scene():
     seconds = int(remaining_time % 60)
     time_remaining_str = f"{minutes}:{seconds:02d}"
 
-    if not player.alive:
+    if player.won:
+        msg = f"YOU WIN! Final Score: {player.score}. Press 'r' to restart."
+    elif not player.alive:
         if elapsed_time >= game_duration:
             msg = f"TIME UP! Final Score: {player.score}. Press 'r' to restart."
         else:
             msg = f"GAME OVER! Score: {player.score}. Press 'r' to restart."
     elif player.inside_house:
         msg = f"Inside house! Press 'e' to exit. Score: {player.score} | Health: {player.health} | Time Left: {time_remaining_str}"
+    elif player.inside_shop:
+        msg = f"Inside shop! Press 'e' to exit. {player.score} Points. Welcome to the shop!"
     else:
         shelter_status = " [Under Shelter]" if player.under_shelter else ""
         rain_status = " [RAINING!]" if rain_system.is_raining else ""
@@ -958,9 +1078,10 @@ def draw_scene():
         msg = f"Catch red/golden apples (+5/+20), avoid black (-10). Score: {player.score} | Health: {player.health} | Time Left: {time_remaining_str}{shelter_status}{rain_status}{snow_status}"
 
     draw_text(20, WINDOW_HEIGHT - 40, msg)
-    draw_text(20, WINDOW_HEIGHT - 70, "[WASD] Move  [Arrows] Rotate  [E] Enter/Leave house  [R] Restart")
+    draw_text(20, WINDOW_HEIGHT - 70, "[WASD] Move  [Arrows] Rotate  [E] Enter/Leave house/shop  [R] Restart")
 
     glutSwapBuffers()
+
 
 # --- GAME LOGIC & UPDATES ---
 def check_dog_collisions():
@@ -969,43 +1090,45 @@ def check_dog_collisions():
     for dog in dogs:
         dx = player.pos[0] - dog.pos[0]
         dy = player.pos[1] - dog.pos[1]
-        dist = math.sqrt(dx*dx + dy*dy)
+        dist = math.sqrt(dx * dx + dy * dy)
         if dist < dog.size + 25:  # collision threshold
             player.score += 0.5
             # Push dog away randomly to prevent multiple counts rapidly
             dog.pos[0] += random.choice([-1, 1]) * dog.size * 2
             dog.pos[1] += random.choice([-1, 1]) * dog.size * 2
 
+
 def check_shelter_protection():
     player.under_shelter = False
     for shelter_x, shelter_y in shelters:
-        if (shelter_x-74 < player.pos[0] < shelter_x+74 and 
-            shelter_y-74 < player.pos[1] < shelter_y+74):
+        if (shelter_x - 74 < player.pos[0] < shelter_x + 74 and
+                shelter_y - 74 < player.pos[1] < shelter_y + 74):
             player.under_shelter = True
             break
+
 
 def update_rain():
     global snow_active, snow_next_time
     now = time.time()
-    
+
     # Don't start rain if it's snowing
     if not rain_system.is_raining and now >= rain_system.next_rain_time and not snow_active:
         rain_system.is_raining = True
         rain_system.rain_start_time = now
         rain_system.next_rain_time = now + RAIN_DURATION + random.randint(RAIN_MIN_INTERVAL, RAIN_MAX_INTERVAL)
-    
+
     # Stop snow if rain starts
     if rain_system.is_raining and snow_active:
         snow_active = False
         snow_next_time = now + random.randint(SNOW_MIN_INTERVAL, SNOW_MAX_INTERVAL)
         init_snowflakes()
-    
+
     if rain_system.is_raining and now - rain_system.rain_start_time >= RAIN_DURATION:
         rain_system.is_raining = False
         rain_system.player_in_rain = False
         rain_system.player_rain_exposure_start = 0
-        
-    if rain_system.is_raining and not player.inside_house and not player.under_shelter and player.alive:
+
+    if rain_system.is_raining and not player.inside_house and not player.under_shelter and player.alive and not player.inside_shop:
         if not rain_system.player_in_rain:
             rain_system.player_in_rain = True
             rain_system.player_rain_exposure_start = now
@@ -1018,9 +1141,10 @@ def update_rain():
         rain_system.player_in_rain = False
         rain_system.player_rain_exposure_start = 0
 
+
 def update_apples():
     global last_apple_time
-    if not player.alive or player.inside_house:
+    if not player.alive or player.inside_house or player.inside_shop:
         return
 
     now = time.time()
@@ -1055,7 +1179,7 @@ def update_apples():
         dy = bucket_y - apple['pos'][1]
         dz = bucket_z - apple['pos'][2]
 
-        dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+        dist = math.sqrt(dx * dx + dy * dy + dz * dz)
 
         # Catch apple if close enough and within vertical range
         if dist < BAG_RADIUS + APPLE_RADIUS and 12 <= apple['pos'][2] <= 55:
@@ -1068,6 +1192,11 @@ def update_apples():
 
             apples.remove(apple)
 
+            # Check win condition
+            if player.score >= 40:
+                player.alive = False
+                player.won = True
+
         # Remove apples that fell below ground
         elif apple['pos'][2] < 5:
             apples.remove(apple)
@@ -1076,13 +1205,14 @@ def update_apples():
     if player.score < -25:
         player.alive = False
 
+
 def update_player():
-    if player.inside_house or not player.alive: 
+    if player.inside_house or not player.alive or player.inside_shop:
         return
-    
+
     rot_angle = player.angle
     new_x, new_y = player.pos[0], player.pos[1]
-    
+
     # Full 4-direction movement (WASD)
     if keys.get(b'w', False):
         new_x += PLAYER_SPEED * math.sin(math.radians(rot_angle))
@@ -1096,36 +1226,117 @@ def update_player():
     if keys.get(b'd', False):
         new_x += PLAYER_SPEED * math.cos(math.radians(rot_angle))
         new_y -= PLAYER_SPEED * math.sin(math.radians(rot_angle))
-    
+
     # Bound check
-    new_x = max(-WORLD_SIZE+35, min(WORLD_SIZE-35, new_x))
-    new_y = max(-WORLD_SIZE+35, min(WORLD_SIZE-35, new_y))
-    
+    new_x = max(-WORLD_SIZE + 35, min(WORLD_SIZE - 35, new_x))
+    new_y = max(-WORLD_SIZE + 35, min(WORLD_SIZE - 35, new_y))
+
     # Simple collision check with house
-    house_left = HOUSE_POS[0]-HOUSE_SIZE//2
-    house_right = HOUSE_POS[0]+HOUSE_SIZE//2
-    house_top = HOUSE_POS[1]+HOUSE_SIZE//2
-    house_bottom = HOUSE_POS[1]-HOUSE_SIZE//2
-    if (house_left-25 < new_x < house_right+25 and house_bottom-25 < new_y < house_top+25):
+    house_left = HOUSE_POS[0] - HOUSE_SIZE // 2
+    house_right = HOUSE_POS[0] + HOUSE_SIZE // 2
+    house_top = HOUSE_POS[1] + HOUSE_SIZE // 2
+    house_bottom = HOUSE_POS[1] - HOUSE_SIZE // 2
+    if (house_left - 25 < new_x < house_right + 25 and house_bottom - 25 < new_y < house_top + 25):
         door_x = HOUSE_POS[0]
-        door_y = HOUSE_POS[1]-HOUSE_SIZE//2
-        if math.sqrt((new_x-door_x)**2 + (new_y-door_y)**2) > 59: 
+        door_y = HOUSE_POS[1] - HOUSE_SIZE // 2
+        if math.sqrt((new_x - door_x) ** 2 + (new_y - door_y) ** 2) > 59:
             return
-    
+
+    # Simple collision check with shop walls
+    shop_left = shop_npc.pos[0] - SHOP_SIZE // 2
+    shop_right = shop_npc.pos[0] + SHOP_SIZE // 2
+    shop_top = shop_npc.pos[1] + SHOP_SIZE // 2
+    shop_bottom = shop_npc.pos[1] - SHOP_SIZE // 2
+    if player.inside_shop:
+        # Player can move freely inside shop (no collision for simplicity)
+        player.pos[0] = new_x
+        player.pos[1] = new_y
+        return
+    else:
+        # Prevent walking into shop walls from outside
+        if (shop_left <= new_x <= shop_right and shop_bottom <= new_y <= shop_top):
+            return
+
     player.pos[0], player.pos[1] = new_x, new_y
     check_shelter_protection()
+
 
 def update_dogs():
     for dog in dogs:
         dog.update()
 
+
+def check_house_entry():
+    if not player.alive:
+        return
+
+    # Check distance to door
+    door_x = HOUSE_POS[0]
+    door_y = HOUSE_POS[1] - HOUSE_SIZE // 2
+
+    dx = player.pos[0] - door_x
+    dy = player.pos[1] - door_y
+    dist = math.sqrt(dx * dx + dy * dy)
+
+    if not player.inside_house and dist < 80 and not player.inside_shop:
+        player.inside_house = True
+        # Move player inside house center on entering
+        player.pos[0] = HOUSE_POS[0]
+        player.pos[1] = HOUSE_POS[1]
+    elif player.inside_house:
+        player.inside_house = False
+        # Move player outside the door when exiting
+        player.pos[0] = door_x
+        player.pos[1] = door_y - 80
+
+
+def check_shop_entry():
+    if not player.alive:
+        return
+
+    shop_left = shop_npc.pos[0] - SHOP_SIZE // 2
+    shop_right = shop_npc.pos[0] + SHOP_SIZE // 2
+    shop_top = shop_npc.pos[1] + SHOP_SIZE // 2
+    shop_bottom = shop_npc.pos[1] - SHOP_SIZE // 2
+
+    px, py = player.pos[0], player.pos[1]
+
+    inside = (shop_left <= px <= shop_right) and (shop_bottom <= py <= shop_top)
+    if inside and not player.inside_shop and not player.inside_house:
+        player.inside_shop = True
+        # Move player to central shop position on entry
+        player.pos[0] = shop_npc.pos[0]
+        player.pos[1] = shop_npc.pos[1]
+        print("Welcome to the shop")  # popup message placeholder
+    elif player.inside_shop and not inside:
+        player.inside_shop = False
+        # Move player outside near shop exit on leaving
+        # For simplicity, move player just outside shop top edge
+        player.pos[0] = shop_npc.pos[0]
+        player.pos[1] = shop_npc.pos[1] + SHOP_SIZE // 2 + 20
+
+
 def keyboard_down(key, x, y):
     keys[key] = True
-    
+
     if key == b'e':
-        check_house_entry()
-    
-    if key == b'r' and not player.alive:
+        if player.inside_shop:
+            player.inside_shop = False
+            # Move player outside shop on exit
+            player.pos[0] = shop_npc.pos[0]
+            player.pos[1] = shop_npc.pos[1] + SHOP_SIZE // 2 + 20
+        elif player.inside_house:
+            player.inside_house = False
+            # Move player outside house on exit
+            player.pos[0] = HOUSE_POS[0]
+            player.pos[1] = HOUSE_POS[1] - HOUSE_SIZE // 2 - 80
+        else:
+            # Try entering house or shop from outside
+            check_house_entry()
+            if not player.inside_house:
+                check_shop_entry()
+
+    if key == b'r' and (not player.alive or player.won):
         # Reset game
         global game_start_time
         game_start_time = time.time()
@@ -1140,56 +1351,39 @@ def keyboard_down(key, x, y):
         global dogs
         dogs = []
         for _ in range(6):
-            dogs.append(Dog(random.randint(-WORLD_SIZE+200, WORLD_SIZE-200), 
-                           random.randint(-WORLD_SIZE+200, WORLD_SIZE-200)))
+            dogs.append(Dog(random.randint(-WORLD_SIZE + 200, WORLD_SIZE - 200),
+                            random.randint(-WORLD_SIZE + 200, WORLD_SIZE - 200)))
         init_snowflakes()
         glutPostRedisplay()
-    
+
     glutPostRedisplay()
+
 
 def keyboard_up(key, x, y):
     keys[key] = False
     glutPostRedisplay()
 
-def check_house_entry():
-    if not player.alive:
-        return
-        
-    # Check distance to door
-    door_x = HOUSE_POS[0]
-    door_y = HOUSE_POS[1] - HOUSE_SIZE//2
-    
-    dx = player.pos[0] - door_x
-    dy = player.pos[1] - door_y
-    dist = math.sqrt(dx*dx + dy*dy)
-    
-    if not player.inside_house and dist < 80:
-        player.inside_house = True
-    elif player.inside_house:
-        player.inside_house = False
-        # Move player outside the door when exiting
-        player.pos[0] = door_x
-        player.pos[1] = door_y - 80
 
 def special_key_down(key, x, y):
     global cam_angle, cam_height
-    if key == GLUT_KEY_LEFT: 
+    if key == GLUT_KEY_LEFT:
         player.angle += TURN_SPEED
-    elif key == GLUT_KEY_RIGHT: 
+    elif key == GLUT_KEY_RIGHT:
         player.angle -= TURN_SPEED
-    elif key == GLUT_KEY_UP: 
-        cam_height = min(cam_height+35, 610)
-    elif key == GLUT_KEY_DOWN: 
-        cam_height = max(cam_height-35, 120)
+    elif key == GLUT_KEY_UP:
+        cam_height = min(cam_height + 35, 610)
+    elif key == GLUT_KEY_DOWN:
+        cam_height = max(cam_height - 35, 120)
     player.angle %= 360
     glutPostRedisplay()
 
+
 def update_game(value):
-    if player.alive:
+    if player.alive and not player.won:
         elapsed_time = time.time() - game_start_time
         if elapsed_time >= game_duration:
             player.alive = False
-    
+
     update_player()
     update_apples()
     update_rain()
@@ -1199,8 +1393,10 @@ def update_game(value):
     glutPostRedisplay()
     glutTimerFunc(16, update_game, 0)
 
+
 # Initialize snowflakes on startup
 init_snowflakes()
+
 
 # --- MAIN FUNCTION ---
 def main():
@@ -1208,7 +1404,7 @@ def main():
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH)
     glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT)
     glutInitWindowPosition(100, 100)
-    glutCreateWindow(b"Apple Catching Game - Enhanced With Snow and Big Dogs")
+    glutCreateWindow(b"Apple Catching Game - Enhanced With Snow, Shop, and Fixed Dogs")
 
     glEnable(GL_DEPTH_TEST)
     glEnable(GL_BLEND)
@@ -1221,6 +1417,7 @@ def main():
     glutTimerFunc(0, update_game, 0)
 
     glutMainLoop()
+
 
 if __name__ == "__main__":
     main()
